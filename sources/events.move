@@ -36,6 +36,13 @@ module larry_talbot::events {
         new_max: u64
     }
     
+    /// Event for protocol started
+    struct ProtocolStarted has copy, drop {
+        admin: address,
+        team_tokens: u64,
+        initial_sui: u64
+    }
+    
     /// Emit price update event
     public fun emit_price_update(timestamp: u64, price: u64, volume_in_sui: u64) {
         event::emit(PriceUpdated {
@@ -80,6 +87,15 @@ module larry_talbot::events {
     public fun emit_max_supply_updated(new_max: u64) {
         event::emit(MaxSupplyUpdated {
             new_max
+        })
+    }
+    
+    /// Emit protocol started event
+    public fun emit_protocol_started(admin: address, team_tokens: u64, initial_sui: u64) {
+        event::emit(ProtocolStarted {
+            admin,
+            team_tokens,
+            initial_sui
         })
     }
 }

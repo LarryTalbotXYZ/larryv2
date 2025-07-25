@@ -60,6 +60,17 @@ module larry_talbot::math {
         (amount * interest_rate_basis_points) / 10000
     }
     
+    /// Convert SUI to LARRY with ceiling (round up)
+    public fun eth_to_larry_no_trade_ceil(value: u64, backing: u64, supply: u64): u64 {
+        if (supply == 0 || backing == 0) {
+            return value * 1000000000; // Default 1:1 with 9 decimals
+        };
+        
+        // Calculate: (value * supply + (backing - 1)) / backing
+        let numerator = (value * supply) + (backing - 1);
+        numerator / backing
+    }
+    
     /// Get midnight timestamp
     public fun get_midnight_timestamp(timestamp: u64): u64 {
         let seconds_in_day = 86400;
