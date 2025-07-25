@@ -11,8 +11,7 @@ module larry_talbot::lending {
     use sui::dynamic_field;
     use sui::clock::{Self, Clock};
     use std::vector;
-    use std::option::{Self, Option};
-    use larry_talbot::larry_token::{Self, LARRY};
+    use larry_talbot::larry_token::LARRY;
     use larry_talbot::admin::{Self, Config};
     use larry_talbot::events;
     use larry_talbot::math;

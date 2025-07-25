@@ -9,7 +9,7 @@ module larry_talbot::trading {
     use sui::tx_context::{Self, TxContext};
     use sui::clock::Clock;
     use std::vector;
-    use larry_talbot::larry_token::{Self, LARRY};
+    use larry_talbot::larry_token::LARRY;
     use larry_talbot::admin::{Self, Config};
     use larry_talbot::events;
     use larry_talbot::math;
@@ -148,15 +148,14 @@ module larry_talbot::trading {
         // Check if trading is started
         assert!(admin::is_started(config), 0);
         
-        // Get total LARRY value and burn tokens
-        let total_larry = {
-            let mut total = 0;
+        // Get total LARRY value
+        let mut total_larry = 0;
+        {
             let mut i = 0;
             while (i < vector::length(&larry_coins)) {
-                total = total + coin::value(vector::borrow(&larry_coins, i));
+                total_larry = total_larry + coin::value(vector::borrow(&larry_coins, i));
                 i = i + 1;
             };
-            total
         };
         
         // Burn all LARRY tokens
