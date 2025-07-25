@@ -7,9 +7,10 @@ module larry_talbot::larry {
     use sui::coin;
     use sui::object;
     use sui::transfer;
-    use sui::tx_context::TxContext;
+    use sui::tx_context::{Self, TxContext};
     use sui::dynamic_field;
     use sui::clock::Clock;
+    use std::vector;
     use larry_talbot::larry_token::{Self, LARRY};
     use larry_talbot::admin::{Self, Config, AdminCap};
     use larry_talbot::events;
@@ -80,41 +81,48 @@ module larry_talbot::larry {
     }
     
     /// Team start function (equivalent to setStart in EVM version)
-    public entry fun team_start<TreasuryCap: store>(
+    public entry fun team_start(
         protocol: &mut Protocol,
         protocol_caps: &mut ProtocolCaps,
-        treasury_cap: &mut TreasuryCap,
-        sui_coins: vector<coin::Coin<coin::SUI>>,
+        sui_coins: vector<coin::Coin<sui::sui::SUI>>,
         ctx: &mut TxContext
     ) {
         // Validate fee address is set
         assert!(admin::get_fee_address(&protocol.config) != @0x0, 0);
         
         // Check exactly 0.001 SUI is sent (equivalent to 0.001 ETH)
-        let total_sui = coin::total_balance(sui_coins);
+        let total_sui = 0;
+        let mut i = 0;
+        while (i < vector::length(&sui_coins)) {
+            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
+            i = i + 1;
+        };
         assert!(total_sui == 1_000_000, 1); // 0.001 SUI with 9 decimals
         
         // Mint 1000 LARRY tokens for team
         let team_amount = 1_000_000_000_000; // 1000 LARRY with 9 decimals
-        let team_coins = coin::mint(treasury_cap, team_amount, ctx);
+        let team_coins = coin::mint(&mut protocol_caps.larry_treasury_cap, team_amount, ctx);
         
         // Burn 1% of minted tokens (10 LARRY)
         let burn_amount = team_amount / 100;
-        let (burn_coins, remaining_coins) = coin::split_vec(vector[team_coins], burn_amount);
-        let burn_coin = coin::from_vec(burn_coins);
-        coin::burn(treasury_cap, burn_coin);
+        let burn_coin = coin::split(&mut team_coins, burn_amount, ctx);
+        coin::burn(&mut protocol_caps.larry_treasury_cap, burn_coin);
         
         // Transfer remaining to sender
-        transfer::public_transfer(remaining_coins, tx_context::sender(ctx));
+        transfer::public_transfer(team_coins, tx_context::sender(ctx));
         
         // Start the protocol
         admin::set_start(&protocol_caps.admin_cap, &mut protocol.config);
         
         // Add SUI to vault
-        let sui_coin = coin::from_vec(sui_coins);
-        let sui_balance = coin::into_balance(sui_coin);
-        let vault_balance = &mut protocol.vault.balance;
-        balance::join(vault_balance, sui_balance);
+        let mut i = 0;
+        while (i < vector::length(&sui_coins)) {
+            let sui_coin = vector::pop_back(&mut sui_coins);
+            let sui_balance = coin::into_balance(sui_coin);
+            balance::join(&mut protocol.vault.balance, sui_balance);
+            i = i + 1;
+        };
+        vector::destroy_empty(sui_coins);
     }
     
     /// Get protocol backing (SUI balance + total borrowed)
@@ -135,16 +143,15 @@ module larry_talbot::larry {
     }
     
     /// Safety check to ensure price doesn't decrease
-    public fun safety_check<TreasuryCap: store>(
+    public fun safety_check(
         protocol: &Protocol,
-        treasury_cap: &TreasuryCap,
         new_sui_amount: u64
     ): bool {
         let new_backing = get_backing(protocol) + new_sui_amount;
-        let larry_supply = coin::supply(treasury_cap);
+        let larry_supply = coin::total_supply(&protocol_caps.larry_treasury_cap);
         
         if (larry_supply == 0) {
-            return true;
+            return true
         };
         
         let new_price = (new_backing * 1_000_000_000) / larry_supply; // Price with 9 decimals

@@ -26,7 +26,7 @@ module larry_talbot::larry_token {
     
     /// Initialize the LARRY token
     fun init(witness: LARRY, ctx: &mut TxContext) {
-        coin::create_currency(
+        let (treasury_cap, metadata) = coin::create_currency(
             witness, 
             9, // 9 decimals like SUI
             b"LARRY TALBOT",
@@ -35,19 +35,23 @@ module larry_talbot::larry_token {
             option::none(),
             ctx
         );
+        
+        // Transfer to sender
+        transfer::public_transfer(treasury_cap, tx_context::sender(ctx));
+        transfer::public_transfer(metadata, tx_context::sender(ctx));
     }
     
     /// Mint new LARRY tokens
-    public entry fun mint<TreasuryCap: store>(treasury_cap: &mut TreasuryCap, amount: u64, ctx: &mut TxContext) {
+    public entry fun mint(treasury_cap: &mut coin::TreasuryCap<LARRY>, amount: u64, ctx: &mut TxContext) {
         let new_coin = coin::mint(treasury_cap, amount, ctx);
         event::emit(MintEvent { amount, to: tx_context::sender(ctx) });
         transfer::public_transfer(new_coin, tx_context::sender(ctx));
     }
     
     /// Burn LARRY tokens
-    public entry fun burn<TreasuryCap: store>(treasury_cap: &mut TreasuryCap, coin: coin::Coin<LARRY>, ctx: &mut TxContext) {
-        let amount = coin::value(&coin);
-        coin::burn(treasury_cap, coin);
+    public entry fun burn(treasury_cap: &mut coin::TreasuryCap<LARRY>, coin_to_burn: coin::Coin<LARRY>, ctx: &mut TxContext) {
+        let amount = coin::value(&coin_to_burn);
+        coin::burn(treasury_cap, coin_to_burn);
         event::emit(BurnEvent { amount, from: tx_context::sender(ctx) });
     }
 }

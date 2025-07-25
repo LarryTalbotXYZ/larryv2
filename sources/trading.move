@@ -6,8 +6,9 @@ module larry_talbot::trading {
     use sui::coin;
     use sui::object;
     use sui::transfer;
-    use sui::tx_context::TxContext;
+    use sui::tx_context::{Self, TxContext};
     use sui::clock::Clock;
+    use std::vector;
     use larry_talbot::larry_token::{Self, LARRY};
     use larry_talbot::admin::{Self, Config};
     use larry_talbot::events;
@@ -39,24 +40,29 @@ module larry_talbot::trading {
     /// Get current pool information
     public fun get_pool_info(vault: &Vault, larry_treasury_cap: &coin::TreasuryCap<LARRY>): PoolInfo {
         let sui_balance = balance::value(&vault.balance);
-        let larry_supply = coin::supply(larry_treasury_cap);
+        let larry_supply = coin::total_supply(larry_treasury_cap);
         PoolInfo { sui_balance, larry_supply }
     }
     
     /// Buy LARRY tokens with SUI
-    public entry fun buy<TreasuryCap: store>(
+    public entry fun buy(
         vault: &mut Vault,
         config: &Config,
-        larry_treasury_cap: &mut TreasuryCap,
+        larry_treasury_cap: &mut coin::TreasuryCap<LARRY>,
         fee_address: address,
-        sui_coins: vector<coin::Coin<coin::SUI>>,
+        sui_coins: vector<coin::Coin<sui::sui::SUI>>,
         ctx: &mut TxContext
     ) {
         // Check if trading is started
         assert!(admin::is_started(config), 0);
         
         // Combine SUI coins and get total value
-        let total_sui = coin::total_balance(sui_coins);
+        let mut total_sui = 0;
+        let mut i = 0;
+        while (i < vector::length(&sui_coins)) {
+            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
+            i = i + 1;
+        };
         
         // Calculate LARRY amount to mint
         let pool_info = get_pool_info(vault, larry_treasury_cap);
@@ -76,15 +82,43 @@ module larry_talbot::trading {
         let team_fee = total_sui / 20; // 5% fee
         assert!(team_fee > MIN_TRADE_AMOUNT, 2);
         
-        // Split SUI for team fee
-        let (fee_coins, remaining_sui) = coin::split_vec(sui_coins, team_fee);
+        // Process SUI coins for vault and fees
+        let mut fee_sent = 0;
+        let mut remaining_sui = vector::empty<coin::Coin<sui::sui::SUI>>();
+        
+        while (!vector::is_empty(&sui_coins)) {
+            let sui_coin = vector::pop_back(&mut sui_coins);
+            let coin_value = coin::value(&sui_coin);
+            
+            if (fee_sent < team_fee) {
+                let fee_to_send = if (coin_value <= team_fee - fee_sent) {
+                    coin_value
+                } else {
+                    team_fee - fee_sent
+                };
+                
+                if (fee_to_send == coin_value) {
+                    transfer::public_transfer(sui_coin, fee_address);
+                    fee_sent = fee_sent + fee_to_send;
+                } else {
+                    let fee_coin = coin::split(&mut sui_coin, fee_to_send, ctx);
+                    transfer::public_transfer(fee_coin, fee_address);
+                    fee_sent = fee_sent + fee_to_send;
+                    vector::push_back(&mut remaining_sui, sui_coin);
+                }
+            } else {
+                vector::push_back(&mut remaining_sui, sui_coin);
+            }
+        };
         
         // Add remaining SUI to vault
-        let sui_coin = coin::from_vec(remaining_sui);
-        balance::join(&mut vault.balance, coin::into_balance(sui_coin));
+        while (!vector::is_empty(&remaining_sui)) {
+            let sui_coin = vector::pop_back(&mut remaining_sui);
+            balance::join(&mut vault.balance, coin::into_balance(sui_coin));
+        };
         
-        // Send team fee
-        transfer::public_transfer(fee_coins, fee_address);
+        vector::destroy_empty(sui_coins);
+        vector::destroy_empty(remaining_sui);
         events::emit_sui_sent(fee_address, team_fee);
         
         // Transfer LARRY to buyer
@@ -106,10 +140,10 @@ module larry_talbot::trading {
     }
     
     /// Sell LARRY tokens for SUI
-    public entry fun sell<TreasuryCap: store>(
+    public entry fun sell(
         vault: &mut Vault,
         config: &Config,
-        larry_treasury_cap: &mut TreasuryCap,
+        larry_treasury_cap: &mut coin::TreasuryCap<LARRY>,
         fee_address: address,
         larry_coins: vector<coin::Coin<LARRY>>,
         ctx: &mut TxContext
@@ -117,12 +151,14 @@ module larry_talbot::trading {
         // Check if trading is started
         assert!(admin::is_started(config), 0);
         
-        // Get total LARRY value
-        let total_larry = coin::total_balance(larry_coins);
-        
-        // Burn LARRY tokens
-        let larry_coin = coin::from_vec(larry_coins);
-        coin::burn(larry_treasury_cap, larry_coin);
+        // Get total LARRY value and burn tokens
+        let mut total_larry = 0;
+        while (!vector::is_empty(&larry_coins)) {
+            let larry_coin = vector::pop_back(&mut larry_coins);
+            total_larry = total_larry + coin::value(&larry_coin);
+            coin::burn(larry_treasury_cap, larry_coin);
+        };
+        vector::destroy_empty(larry_coins);
         
         // Calculate SUI amount to return
         let pool_info = get_pool_info(vault, larry_treasury_cap);
@@ -143,15 +179,17 @@ module larry_talbot::trading {
         assert!(balance::value(&vault.balance) >= (sui_after_fee + team_fee), 3);
         
         // Split SUI from vault
-        let total_payout = sui_after_fee + team_fee;
-        let sui_coins = balance::split(&mut vault.balance, total_payout);
-        let (user_sui, fee_sui) = coin::split(sui_coins, sui_after_fee);
+        let user_sui_balance = balance::split(&mut vault.balance, sui_after_fee);
+        let fee_sui_balance = balance::split(&mut vault.balance, team_fee);
+        
+        let user_sui_coin = coin::from_balance(user_sui_balance, ctx);
+        let fee_sui_coin = coin::from_balance(fee_sui_balance, ctx);
         
         // Send SUI to user
-        transfer::public_transfer(user_sui, tx_context::sender(ctx));
+        transfer::public_transfer(user_sui_coin, tx_context::sender(ctx));
         
         // Send team fee
-        transfer::public_transfer(fee_sui, fee_address);
+        transfer::public_transfer(fee_sui_coin, fee_address);
         events::emit_sui_sent(fee_address, team_fee);
         
         // Emit events
@@ -170,10 +208,10 @@ module larry_talbot::trading {
     }
     
     /// Get buy amount for a given SUI amount
-    public fun get_buy_amount<TreasuryCap: store>(
+    public fun get_buy_amount(
         sui_amount: u64,
         vault: &Vault,
-        larry_treasury_cap: &TreasuryCap,
+        larry_treasury_cap: &coin::TreasuryCap<LARRY>,
         config: &Config
     ): u64 {
         let pool_info = get_pool_info(vault, larry_treasury_cap);
