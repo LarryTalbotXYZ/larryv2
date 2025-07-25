@@ -131,45 +131,40 @@ module larry_talbot::lending {
         };
         
         // Process SUI coins for fees and vault
-        let mut fee_sent = 0;
-        let mut remaining_sui = vector::empty<coin::Coin<sui::sui::SUI>>();
+        let fee_balance = balance::zero<sui::sui::SUI>();
+        let vault_balance_to_add = balance::zero<sui::sui::SUI>();
+        let mut fee_collected = 0;
         
-        while (!vector::is_empty(&sui_coins)) {
+        while (!vector::is_empty(&mut sui_coins)) {
             let sui_coin = vector::pop_back(&mut sui_coins);
             let coin_value = coin::value(&sui_coin);
+            let coin_balance = coin::into_balance(sui_coin);
             
-            if (fee_sent < fee_address_amount) {
-                let fee_to_send = if (coin_value <= fee_address_amount - fee_sent) {
-                    coin_value
+            if (fee_collected < fee_address_amount) {
+                let fee_needed = fee_address_amount - fee_collected;
+                if (coin_value <= fee_needed) {
+                    balance::join(&mut fee_balance, coin_balance);
+                    fee_collected = fee_collected + coin_value;
                 } else {
-                    fee_address_amount - fee_sent
-                };
-                
-                if (fee_to_send == coin_value) {
-                    transfer::public_transfer(sui_coin, fee_address);
-                    fee_sent = fee_sent + fee_to_send;
-                } else {
-                    let fee_coin = coin::split(&mut sui_coin, fee_to_send, ctx);
-                    transfer::public_transfer(fee_coin, fee_address);
-                    fee_sent = fee_sent + fee_to_send;
-                    vector::push_back(&mut remaining_sui, sui_coin);
+                    let fee_part = balance::split(&mut coin_balance, fee_needed);
+                    balance::join(&mut fee_balance, fee_part);
+                    balance::join(&mut vault_balance_to_add, coin_balance);
+                    fee_collected = fee_collected + fee_needed;
                 }
             } else {
-                vector::push_back(&mut remaining_sui, sui_coin);
+                balance::join(&mut vault_balance_to_add, coin_balance);
             }
         };
         
-        // Send fee event
+        // Add to vault
+        balance::join(&mut vault.balance, vault_balance_to_add);
+        
+        // Send fee
+        let fee_coin = coin::from_balance(fee_balance, ctx);
+        transfer::public_transfer(fee_coin, fee_address);
         events::emit_sui_sent(fee_address, fee_address_amount);
         
-        // Add remaining SUI to vault
-        while (!vector::is_empty(&remaining_sui)) {
-            let sui_coin = vector::pop_back(&mut remaining_sui);
-            balance::join(&mut vault.balance, coin::into_balance(sui_coin));
-        };
-        
         vector::destroy_empty(sui_coins);
-        vector::destroy_empty(remaining_sui);
         
         // Send borrowed SUI to user
         let borrowed_sui_balance = balance::split(&mut vault.balance, user_borrow);

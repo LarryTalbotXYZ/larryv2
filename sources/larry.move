@@ -36,7 +36,7 @@ module larry_talbot::larry {
     
     /// Initialize the entire protocol
     public fun init(
-        witness: larry_token::LARRY,
+        witness: larry_token::LARRY_TOKEN,
         ctx: &mut TxContext
     ) {
         // Initialize LARRY token
