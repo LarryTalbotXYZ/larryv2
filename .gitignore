@@ -1,0 +1,55 @@
+# Build outputs
+build/
+.build/
+
+# Sui specific
+.sui/
+sui.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+.npm
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Claude assistant files
+.claude/ 
