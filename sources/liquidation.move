@@ -7,9 +7,10 @@ module larry_talbot::liquidation {
     use sui::coin;
     use sui::object;
     use sui::transfer;
-    use sui::tx_context::TxContext;
+    use sui::tx_context::{Self, TxContext};
     use sui::dynamic_field;
-    use sui::clock::Clock;
+    use sui::clock::{Self, Clock};
+    use std::option;
     use larry_talbot::larry_token::{Self, LARRY};
     use larry_talbot::admin::{Self, Config};
     use larry_talbot::events;
@@ -115,16 +116,11 @@ module larry_talbot::liquidation {
     }
     
     /// Get loans expiring by date
-    public fun get_loans_expiring_by_date(addr: address, date: u64): (u64, u64) {
+    public fun get_loans_expiring_by_date(loan_stats: &LoanStats, addr: address, date: u64): (u64, u64) {
         let midnight = math::get_midnight_timestamp(date);
-        if (dynamic_field::exists_<u64, Loan>(addr, midnight)) {
-            let loan = dynamic_field::borrow<address, u64, Loan>(addr, midnight);
-            if (option::is_some(loan)) {
-                let loan_val = option::borrow(loan);
-                (loan_val.borrowed, loan_val.collateral)
-            } else {
-                (0, 0)
-            }
+        if (dynamic_field::exists_(&loan_stats.id, addr)) {
+            let loan = dynamic_field::borrow(&loan_stats.id, addr);
+            (loan.borrowed, loan.collateral)
         } else {
             (0, 0)
         }

@@ -4,7 +4,7 @@
 module larry_talbot::admin {
     use sui::object;
     use sui::transfer;
-    use sui::tx_context::TxContext;
+    use sui::tx_context::{Self, TxContext};
     use sui::event;
     
     /// Admin capability for controlling protocol parameters
