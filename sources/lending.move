@@ -89,11 +89,14 @@ module larry_talbot::lending {
         assert!(number_of_days < 366, 1); // Max 365 days
         
         // Get total SUI value
-        let mut total_sui = 0;
-        let mut i = 0;
-        while (i < vector::length(&sui_coins)) {
-            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
-            i = i + 1;
+        let total_sui = {
+            let mut total = 0;
+            let mut i = 0;
+            while (i < vector::length(&sui_coins)) {
+                total = total + coin::value(vector::borrow(&sui_coins, i));
+                i = i + 1;
+            };
+            total
         };
         
         // Calculate fees
@@ -239,19 +242,20 @@ module larry_talbot::lending {
         let required_larry = (sui_amount * COLLATERALIZATION_RATE) / 100;
         
         // Check if user provided enough LARRY
-        let mut provided_larry = 0;
-        let mut i = 0;
-        while (i < vector::length(&larry_coins)) {
-            provided_larry = provided_larry + coin::value(vector::borrow(&larry_coins, i));
-            i = i + 1;
+        let provided_larry = {
+            let mut total = 0;
+            let mut i = 0;
+            while (i < vector::length(&larry_coins)) {
+                total = total + coin::value(vector::borrow(&larry_coins, i));
+                i = i + 1;
+            };
+            total
         };
         assert!(provided_larry >= required_larry, 3);
         
         // Process LARRY collateral tokens
-        let mut total_collateral_value = 0;
-        while (!vector::is_empty(&larry_coins)) {
+        while (!vector::is_empty(&mut larry_coins)) {
             let larry_coin = vector::pop_back(&mut larry_coins);
-            total_collateral_value = total_collateral_value + coin::value(&larry_coin);
             // For simplicity, we'll destroy the coins - in reality they'd be held
             coin::burn(larry_treasury_cap, larry_coin);
         };
@@ -305,11 +309,14 @@ module larry_talbot::lending {
         ctx: &mut TxContext
     ) {
         // Get total SUI repaid
-        let mut total_sui = 0;
-        let mut i = 0;
-        while (i < vector::length(&sui_coins)) {
-            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
-            i = i + 1;
+        let total_sui = {
+            let mut total = 0;
+            let mut i = 0;
+            while (i < vector::length(&sui_coins)) {
+                total = total + coin::value(vector::borrow(&sui_coins, i));
+                i = i + 1;
+            };
+            total
         };
         
         // Find user's loan

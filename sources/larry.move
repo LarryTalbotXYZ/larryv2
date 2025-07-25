@@ -91,11 +91,14 @@ module larry_talbot::larry {
         assert!(admin::get_fee_address(&protocol.config) != @0x0, 0);
         
         // Check exactly 0.001 SUI is sent (equivalent to 0.001 ETH)
-        let total_sui = 0;
-        let mut i = 0;
-        while (i < vector::length(&sui_coins)) {
-            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
-            i = i + 1;
+        let total_sui = {
+            let mut total = 0;
+            let mut i = 0;
+            while (i < vector::length(&sui_coins)) {
+                total = total + coin::value(vector::borrow(&sui_coins, i));
+                i = i + 1;
+            };
+            total
         };
         assert!(total_sui == 1_000_000, 1); // 0.001 SUI with 9 decimals
         
@@ -115,12 +118,10 @@ module larry_talbot::larry {
         admin::set_start(&protocol_caps.admin_cap, &mut protocol.config);
         
         // Add SUI to vault
-        let mut i = 0;
-        while (i < vector::length(&sui_coins)) {
+        while (!vector::is_empty(&mut sui_coins)) {
             let sui_coin = vector::pop_back(&mut sui_coins);
             let sui_balance = coin::into_balance(sui_coin);
             balance::join(&mut protocol.vault.balance, sui_balance);
-            i = i + 1;
         };
         vector::destroy_empty(sui_coins);
     }
