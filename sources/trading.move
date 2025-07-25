@@ -17,7 +17,7 @@ module larry_talbot::trading {
     /// Vault to hold SUI backing the LARRY token
     struct Vault has key {
         id: object::UID,
-        balance: balance::Balance<coin::SUI>
+        balance: balance::Balance<sui::sui::SUI>
     }
     
     /// Pool information for price calculations
@@ -57,11 +57,14 @@ module larry_talbot::trading {
         assert!(admin::is_started(config), 0);
         
         // Combine SUI coins and get total value
-        let mut total_sui = 0;
-        let mut i = 0;
-        while (i < vector::length(&sui_coins)) {
-            total_sui = total_sui + coin::value(vector::borrow(&sui_coins, i));
-            i = i + 1;
+        let total_sui = {
+            let mut sum = 0;
+            let mut i = 0;
+            while (i < vector::length(&sui_coins)) {
+                sum = sum + coin::value(vector::borrow(&sui_coins, i));
+                i = i + 1;
+            };
+            sum
         };
         
         // Calculate LARRY amount to mint
@@ -149,13 +152,14 @@ module larry_talbot::trading {
         assert!(admin::is_started(config), 0);
         
         // Get total LARRY value
-        let mut total_larry = 0;
-        {
+        let total_larry = {
+            let mut sum = 0;
             let mut i = 0;
             while (i < vector::length(&larry_coins)) {
-                total_larry = total_larry + coin::value(vector::borrow(&larry_coins, i));
+                sum = sum + coin::value(vector::borrow(&larry_coins, i));
                 i = i + 1;
             };
+            sum
         };
         
         // Burn all LARRY tokens
