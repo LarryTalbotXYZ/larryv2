@@ -334,13 +334,9 @@ module larry_talbot::lending {
         // In a real implementation, we would remove from dynamic fields
     }
     
-    /// Get loan information for an address
-    public fun get_loan_info(loan_stats: &LoanStats, addr: address): option::Option<&Loan> {
-        if (dynamic_field::exists_(&loan_stats.id, addr)) {
-            option::some(dynamic_field::borrow(&loan_stats.id, addr))
-        } else {
-            option::none()
-        }
+    /// Check if loan exists for address
+    public fun has_loan(loan_stats: &LoanStats, addr: address): bool {
+        dynamic_field::exists_(&loan_stats.id, addr)
     }
     
     /// Check if loan is expired

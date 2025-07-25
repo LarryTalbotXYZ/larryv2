@@ -8,8 +8,8 @@ module larry_talbot::larry_token {
     use sui::tx_context::{Self, TxContext};
     use sui::event;
     
-    /// LARRY Token Type - One-time witness for coin creation
-    struct LARRY_TOKEN has drop {}
+    /// The LARRY coin type
+    struct LARRY has drop {}
     
     /// Event for token minting
     struct MintEvent has copy, drop {
@@ -23,9 +23,12 @@ module larry_talbot::larry_token {
         from: address
     }
     
-    /// Initialize the LARRY token
-    fun init(witness: LARRY_TOKEN, ctx: &mut TxContext) {
-        let (treasury_cap, metadata) = coin::create_currency(
+    /// Initialize the LARRY token - this will be called from the main module
+    public fun create_currency(
+        witness: LARRY,
+        ctx: &mut TxContext
+    ): (coin::TreasuryCap<LARRY>, coin::CoinMetadata<LARRY>) {
+        coin::create_currency(
             witness, 
             9, // 9 decimals like SUI
             b"LARRY TALBOT",
@@ -33,11 +36,7 @@ module larry_talbot::larry_token {
             b"LARRY TALBOT Token",
             option::none(),
             ctx
-        );
-        
-        // Transfer to sender
-        transfer::public_transfer(treasury_cap, tx_context::sender(ctx));
-        transfer::public_transfer(metadata, tx_context::sender(ctx));
+        )
     }
     
     /// Mint new LARRY tokens

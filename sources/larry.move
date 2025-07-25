@@ -35,20 +35,10 @@ module larry_talbot::larry {
     }
     
     /// Initialize the entire protocol
-    public fun init(
-        witness: larry_token::LARRY_TOKEN,
-        ctx: &mut TxContext
-    ) {
-        // Initialize LARRY token
-        let (treasury_cap, metadata) = coin::create_currency(
-            witness, 
-            9, // 9 decimals like SUI
-            b"LARRY TALBOT",
-            b"LARRY",
-            b"LARRY TALBOT Token",
-            option::none(),
-            ctx
-        );
+    fun init(ctx: &mut TxContext) {
+        // Create LARRY witness and initialize token
+        let larry_witness = larry_token::LARRY {};
+        let (treasury_cap, metadata) = larry_token::create_currency(larry_witness, ctx);
         
         // Create admin capabilities
         let (admin_cap, config) = admin::create_admin(ctx);
